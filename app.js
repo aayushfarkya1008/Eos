@@ -7,12 +7,71 @@ var app = express();
 var title;
 var overview;
 var url = "mongodb://localhost:27017";
+
+databaseConnection(url, MongoClient);
+
 databaseConnection(url, MongoClient).then((moviesDB)=>{
-    if(moviesDB != undefined)    
-        initDatabase(moviesDB);
-    else
-        console.log('moviesDB Undefined');
+        if(moviesDB != undefined)   
+            console.log('Inside moviesDB'); 
+            initDatabase(moviesDB);
+        },function(err) {
+            console.log('moviesDB Undefined');; // Error: "It broke"
+}); 
+
+ function databaseConnection(url, MongoClient)  {
+    return new Promise((resolve, reject) =>{
+        var moviesDB;
+        MongoClient.connect(url, {useNewUrlParser : true}, (error , client) => {
+            if (error){
+                throw error;
+            }
+            console.log("connected");
+            moviesDB = client.db('tmdb');
+            
+                if(moviesDB != undefined)    
+                    resolve(moviesDB);
+                else
+                    reject('moviesDB Undefined');
+        }); 
     });
+}
+ 
+function initDatabase(db)  {
+    console.log('inside moviesDB');
+    for(var i = 1; i <= 20; i++)  {     
+        url = 'https://api.themoviedb.org/3/discover/movie?with_genres=28&page='+i+'&sort_by=vote_average.desc&api_key=72b89b76172411ea29cb1f8834895197'
+        axios.get(url).then((jsondata) => {
+            insertPageToDatabase(jsondata.data.results, db);
+        }).catch(err=>{
+            console.log('Request Failed'+err);
+        });
+    }
+}
+
+
+function insertPageToDatabase(results, moviesDB)  {
+    results.forEach((movie)=>{
+        console.log(movie.original_title);
+        moviesDB.collection('movie').insertOne({
+            title : movie.original_title, 
+            overview : movie.overview, 
+            image : movie.poster_path, 
+            rating : movie.vote_average, 
+            budget : movie.budget, 
+            movienumber : movie.id
+        });
+    })
+}
+
+// use tmdb
+// db.movie.countDocuments({})
+// db.movie.remove({title:{$ne:"test"}});
+
+
+
+
+
+
 app.get('/', function(req, responseToClient){
     //res.send(title);
     var movienumber = req.query.movienumber != undefined?req.query.movienumber:551;
@@ -44,59 +103,4 @@ app.get('/', function(req, responseToClient){
     });
 })
 
-
-app.listen(3003);
-
-async function databaseConnection(url, MongoClient)  {
-    var moviesDB;
-    await MongoClient.connect(url, {useNewUrlParser : true}, (error , client) => {
-        if (error){
-            throw error;
-        }
-        console.log("connected");
-        moviesDB = client.db('tmdb');
-        return moviesDB;
-        moviesDB.collection('movie').find({}).toArray(function(err, docs) {
-            //console.log(docs)
-        });
-        //To close the connection
-    });
-}
-
- async function initDatabase(db)  {
-    for(var i = 1; i <= 20; i++)  {     
-        url = 'https://api.themoviedb.org/3/discover/movie?with_genres=28&page='+i+'&sort_by=vote_average.desc&api_key=72b89b76172411ea29cb1f8834895197'
-        requestTMDB(url).
-        then((jsondata) => {
-            insertPageToDatabase(jsondata.data.results, db);
-        });
-    }
-}
-
-async function requestTMDB(url)  {
-    let responseFromApi = await axios.get(url);
-    return responseFromApi;
-    
-}
-
-function insertPageToDatabase(results, moviesDB)  {
-    results.forEach((movie)=>{
-        console.log(movie.original_title);
-        moviesDB.collection('movie').insertOne({
-            title : movie.original_title, 
-            overview : movie.overview, 
-            image : movie.poster_path, 
-            rating : movie.vote_average, 
-            budget : movie.budget, 
-            movienumber : movie.id
-        });
-    })
-}
-
-
-
-
-
-
-
-
+app.listen(3000);
